@@ -1,12 +1,11 @@
 // set the dimensions and margins of the graph
-var margin = {top: 0, right: 30, bottom: 50, left: 60},
-  width = 900 - margin.left - margin.right,
+let margin = {top: 0, right: 30, bottom: 50, left: 60},
+  width = 1200 - margin.left - margin.right,
   height = 600 - margin.top - margin.bottom;
 
-  console.log('yo')
 
 // append the svg object to the body of the page
-var svg = d3.select("#my_dataviz")
+const svg = d3.select("#my_dataviz")
   .append("svg")
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
@@ -14,40 +13,43 @@ var svg = d3.select("#my_dataviz")
     .attr("transform",
           "translate(" + margin.left + "," + margin.top + ")")
 
+let size = d3.scaleLinear()
+    .domain([1,20])
+    .range([5,20]);
 // Read dummy data
 d3.json("arcData4.json", function( data) {
   console.log(data)
   // List of node names
-  var allNodes = data.nodes.map(function(d){return d.name})
+  let allNodes = data.nodes.map(function(d){return d.name})
 
   // List of groups
-  var allGroups = data.nodes.map(function(d){return d.grp})
+  let allGroups = data.nodes.map(function(d){return d.grp})
   allGroups = [...new Set(allGroups)]
 
   // A color scale for groups:
-  var color = d3.scaleOrdinal()
+  let color = d3.scaleOrdinal()
     .domain(allGroups)
     .range(d3.schemeSet2);
 
   // A linear scale for node size
-  var size = d3.scaleLinear()
+  let size = d3.scaleLinear()
     .domain([1,20])
     .range([5,20]);
 
   // A linear scale to position the nodes on the X axis
-  var x = d3.scalePoint()
+  let x = d3.scalePoint()
     .range([0, width])
     .domain(allNodes)
 
   // In my input data, links are provided between nodes -id-, NOT between node names.
   // So I have to do a link between this id and the name
-  var idToNode = {};
+  let idToNode = {};
   data.nodes.forEach(function (n) {
     idToNode[n.id] = n;
   });
 
   // Add the links
-  var links = svg
+  let links = svg
     .selectAll('mylinks')
     .data(data.links)
     .enter()
@@ -62,24 +64,47 @@ d3.json("arcData4.json", function( data) {
         start < end ? 1 : 0, end, ',', height-30] // We always want the arc on top. So if end is before start, putting 0 here turn the arc upside down.
         .join(' ');
     })
+    // .classed('arcLink', true)
+    .attr('class', d => 'arcLink ' + d.source)
+
+  links
     .style("fill", "none")
     .attr("stroke", "#d3d3d3")
     .style("stroke-width", 1)
+    .attr('stroke-dashoffset', function() {
+      return this.getTotalLength()
+    })
+    .attr("stroke-dasharray", function() {
+      return this.getTotalLength();
+    })
+    // .transition()
+    //   .duration(3000)
+    //   .attr("stroke-dashoffset", 0)
+    
 
   // Add the circle for the nodes
-  var nodes = svg
+  let nodes = svg
     .selectAll("mynodes")
     .data(data.nodes.sort(function(a,b) { return +b.n - +a.n }))
     .enter()
     .append("circle")
+      .attr('class', 'arcNode')
       .attr("cx", function(d){ return(x(d.name))})
       .attr("cy", height-30)
-      .attr("r", function(d){ return(size(d.n))})
+      .attr("r", 0)
       .style("fill", function(d){ return color(d.grp)})
-      .attr("stroke", "white")
+      .attr("stroke", "black")
+      .attr('stroke-width', 1)
+
+  // show nodes from left to right
+  nodes
+    .transition()
+    .duration(2000)
+    .delay((d,i) => i*10)
+    .attr('r', 9.5)
 
   // And give them a label
-  var labels = svg
+  let labels = svg
     .selectAll("mylabels")
     .data(data.nodes)
     .enter()
@@ -87,9 +112,12 @@ d3.json("arcData4.json", function( data) {
       .attr("x", 0)
       .attr("y", 0)
       .text(function(d){ return(d.name)} )
+      .style('font-family', 'Comfortaa')
       .style("text-anchor", "end")
       .attr("transform", function(d){ return( "translate(" + (x(d.name)) + "," + (height-15) + ")rotate(-45)")})
       .style("font-size", 6)
+
+
 
   // Add the highlighting functionnality
   nodes
@@ -104,6 +132,7 @@ d3.json("arcData4.json", function( data) {
         .style('stroke', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? color(d.grp) : '#b8b8b8';})
         .style('stroke-opacity', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? 1 : .2;})
         .style('stroke-width', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? 4 : 1;})
+
       labels
         .style("font-size", function(label_d){ return label_d.name === d.name ? 16 : 2 } )
         .attr("y", function(label_d){ return label_d.name === d.name ? 10 : 0 } )
@@ -121,3 +150,41 @@ d3.json("arcData4.json", function( data) {
     })
 })
 
+
+d3.select('#resizeNodes')
+  .on('click', function(d) {
+    d3.selectAll('circle.arcNode')
+      .transition()
+      .duration(2000)
+      .attr("r", function(d){ return(size(d.n))})
+  })
+
+d3.select('#addLinks')
+  .on('click', () => {
+    d3.selectAll('.arcLink')
+    .transition()
+      .duration(2000)
+      .attr("stroke-dashoffset", 0)
+  })
+
+
+d3.select('#addJonLinks')
+  .on('click', () => {
+    d3.selectAll('.Jon')
+    .transition()
+      .duration(2000)
+      .attr("stroke-dashoffset", 0)
+      .style('stroke', color(d.grp))
+        .style('stroke-opacity', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? 1 : .2;})
+        .style('stroke-width', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? 4 : 1;})
+
+  })
+
+
+d3.select('#addTyrionLinks')
+  .on('click', () => {
+    d3.selectAll('.Tyrion')
+    .transition()
+      .duration(2000)
+      .attr("stroke-dashoffset", 0)
+  })
